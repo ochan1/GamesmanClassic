@@ -37,8 +37,8 @@ extern STRING kHelpReverseObjective;
  * Sun shared libraries to be used for Tcl.
  */
 
-extern int matherr();
-int *tclDummyMathPtr = (int *) matherr;
+//extern int matherr();
+//int *tclDummyMathPtr = (int *) matherr;
 
 /*************************************************************************
 **

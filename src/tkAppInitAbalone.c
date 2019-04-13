@@ -34,8 +34,8 @@ extern int       destination (int, int);
  * Sun shared libraries to be used for Tcl.
  */
 
-extern int matherr();
-int *tclDummyMathPtr = (int *) matherr;
+//extern int matherr();
+//int *tclDummyMathPtr = (int *) matherr;
 
 /*************************************************************************
 **
