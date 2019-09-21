@@ -212,7 +212,7 @@ void SetupTierStuff();
 STRING TierToString(TIER tier);
 TIERLIST* TierChildren(TIER tier);
 TIERPOSITION NumberOfTierPositions(TIER tier);
-POSITION hash(int);
+POSITION Hash(int);
 void unhash(POSITION, int*);
 void FreeHelper(struct row**);
 
@@ -569,7 +569,7 @@ MOVE theMove;
 	}
 
 	if (DEBUGGING) printf("finished do move\n");
-	return (hash((whoseTurn == 1 ? 2 : 1)));
+	return (Hash((whoseTurn == 1 ? 2 : 1)));
 }
 
 /************************************************************************
@@ -659,7 +659,7 @@ POSITION GetInitialPosition()
 			printf ("\n\n Please enter x or o\n\n");
 	}
 
-	return hash(player);
+	return Hash(player);
 }
 
 
@@ -2236,7 +2236,7 @@ void SetupGame() {
 	gMax = generic_hash_init(BOARDSIZE,init_array,NULL,0);
 	generic_hash_set_context( PiecesToTier(PIECES+1, PIECES+1) );
 
-	init = hash( 1);
+	init = Hash(1);
 
 	gNumberOfPositions  = gMax;
 	gInitialPosition    = init;
@@ -2329,7 +2329,7 @@ void SetupTierStuff() {
 	// Initial
 	gInitialTier = BoardToTier(gBoard);
 	generic_hash_context_switch(gInitialTier);
-	gInitialTierPosition = hash(1);
+	gInitialTierPosition = Hash(1);
 }
 
 // children = always me and one below
@@ -2371,7 +2371,7 @@ void unhash (POSITION position, int* turn)
 
 }
 
-POSITION hash (int turn)
+POSITION Hash (int turn)
 {
 	if (gHashWindowInitialized) {
 		TIER tier = BoardToTier(gBoard);

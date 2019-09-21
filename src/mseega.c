@@ -265,7 +265,7 @@ void setPlacingBoard(Board b, BOOLEAN t);
 
 void makeRandomBoard(Board b);
 
-POSITION hash(Board b);
+POSITION Hash(Board b);
 void unhash(Board b, POSITION p);
 
 
@@ -325,7 +325,7 @@ void InitializeGame () {
 		}
 		setWhoseBoard(b, 'x');
 		setPlacingBoard(b,TRUE);
-		gInitialPosition = hash(b);
+		gInitialPosition = Hash(b);
 		//printf ("init------------- %d",gInitialPosition);
 	} while (FALSE);
 
@@ -551,9 +551,9 @@ POSITION DoMove (POSITION position, MOVE m) {
 		setWhoseBoard(b, d);
 	}
 	if (DEBUGGING) { for (c=0; c<BOARDARRAYSIZE; c++) printf("%c",getpce(b,c));
-		         unhash(b,hash(b));
+		         unhash(b, Hash(b));
 		         for (c=0; c<BOARDARRAYSIZE; c++) printf("%c",getpce(b,c)); }
-	return hash(b);
+	return Hash(b);
 }
 
 /************************************************************************
@@ -1194,7 +1194,7 @@ char otherPlayer(char c) {
 	return c=='x' ? 'o' : 'x';
 }
 
-POSITION hash(Board b) {
+POSITION Hash(Board b) {
 	return generic_hash_hash(b,whoToInt(whoseBoard(b)));
 }
 void unhash(Board b, POSITION p) {
