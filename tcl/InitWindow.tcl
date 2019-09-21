@@ -269,7 +269,7 @@ proc InitWindow { kRootDir kExt } {
   global gMistakeList
 
   # Network play
-  package require scrolledLB
+  # sethlu:scrolledLB is defined in network.tcl: package require scrolledLB
   option add *Scrolledlb*Listbox*background white	
   global gOnlineTxtFile
   set gOnlineTxtFile "online.txt"
