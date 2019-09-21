@@ -1516,7 +1516,7 @@ char **argv;                            /* Argument strings. */
 
 			/* If this barfs, change 'char' to 'const char' */
 
-			strcpy(theAnswer,(char *)strcat(theAnswer,tmp));
+			strcat(theAnswer,tmp);
 			ptr = ptr->next;
 		}
 		Tcl_SetResult(interp,theAnswer,TCL_VOLATILE);
