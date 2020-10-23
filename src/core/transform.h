@@ -4,6 +4,7 @@
 inputed boardsize rows and columns to reduce what we 
 have to pass into each call.*/ 
 void init_transform(bool rect, bool hex, int row, int col, int boardsize);
+void free_transform(void);
 void reflection(int* dst, int* src, int angle);
 void rotation(int* dst, int* src, int angle);
 #endif
