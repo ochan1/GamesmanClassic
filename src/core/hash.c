@@ -114,7 +114,20 @@ void            initializeHashtable();
 void            hashtablePut(int, int, int);
 int         hashtableGet(int);
 void            freeHashtable();
-
+#ifdef PTHREAD
+pthread_mutex_t lock;
+typedef struct t_args {
+	char* board;
+	struct* symEntry sym;
+	int player;
+	POSITION offset;
+	int* localCounts;
+	int* localMins;
+	POSITION* minPos;
+} t_args_t;
+t_args_t* thread_args;
+pthread_t* threads;
+#endif
 /*******************************
 **
 **  Generic Hash Initialization
@@ -408,6 +421,27 @@ POSITION generic_hash_hash_sym(char* board, int player, POSITION offset, struct 
 		return temp;
 	else return temp + (player-1)*(cCon->maxPos); //accomodates generic_hash_turn
 }
+void generic_hash_hash_sym_thread(t_args_t* args) {
+	int i,j;
+	POSITION temp;
+
+	for (i = 0; i < cCon->boardSize;i++) {
+		for (j = 0; j < cCon->numPieces;j++) {
+			if (args->board[args->sym[i]] == cCon->pieces[j]) {
+				args->localCount[j]++;
+			}
+		}
+	}
+	temp = args->offset + hash_cruncher_sym_threads(args->board,args->sym, args->localCount,args->localMins);
+	if (args->player == 0) {
+		temp += (args->player-1)*cCon->maxPos;
+	}
+	pthread_mutex_lock(&lock);
+	if (*args->minPos == -1 || temp < *args->minPos) {
+		*args->minPos = temp;
+	}
+	pthread_mutex_unlock(&lock);
+}
 
 /* helper func from generic_hash_unhash() computes lexicographic rank of *board
    among boards with the same configuration argument *thiscount */
@@ -469,7 +503,29 @@ POSITION hash_cruncher_sym (char* board, struct symEntry* symIndex)
 
 	return sum;
 }
-
+POSITION hash_cruncher_sym_threads(char* board, struct symEntry* sym, int* counts, int* mins) {
+	POSITION sum = 0;
+	int i = 0, k = 0, max1 = 0;
+	for (int boardSize = cCon->boardSize; boardSize>1;boardSize--) {
+		i = 0;
+		while (board[sym->sym[boardSize-1]] != cCon->pieces[i]) {
+			i++;
+		}
+		for (k = 0; k < i; k++) {
+			if (mins[k] > 1) {
+				max1 = mins[k];
+			}
+			if (counts[k] >= max1) {
+				counts[k]--;
+				sum += combiCount(counts);
+				counts[k]++;
+			}
+		}
+		counts[i]--;
+		mins[i]--;
+	}
+	return sum;
+}
 /* tells whose move it is, given a board's hash number */
 int generic_hash_turn (POSITION hashed)
 {
@@ -1244,6 +1300,17 @@ void generic_hash_init_sym(int boardType, int numRows, int numCols, int* reflect
 		SafeFree(hex0Ref);
 		SafeFree(tempSym);
 	}
+	#ifdef PTHREAD
+	thread_args = malloc(sizeof(t_args_t)*numSymmetries);
+	pthread_mutex_init(&lock,NULL);
+	for (i = 0 && symIndex = symmetriesList; symIndex != NULL; i++ && symIndex = symIndex->next) {
+		*(thread_args+i)->board = malloc(sizeof(char)*boardsize);
+		*(thread_args+i)->sym = symIndex;
+		*(thread_args+i)->localCounts = malloc(sizeof(int)*cCon->numPieces);	
+		*(thread_args+i)->localMins = malloc(sizeof(int)*cCon->numPieces);	
+	}
+	threads = malloc(sizeof(pthread_t)*numSymmetries);
+	#endif
 	// set the function pointer.
 	gCanonicalPosition = generic_hash_canonicalPosition;
 }
@@ -1375,7 +1442,7 @@ POSITION generic_hash_canonicalPosition(POSITION pos) {
 		}
 		flippedoffset = cCon->hashOffset[searchIndices(flippedsum)];
 	}
-
+	#ifndef PTHREAD
 	minPos = generic_hash_hash_sym(board, player, offset, symmetriesList);
 	// try each symmetry, keeping the lowest position hash
 	// returns as the canonical position.
@@ -1388,6 +1455,26 @@ POSITION generic_hash_canonicalPosition(POSITION pos) {
 		symIndex = symIndex->next;
 
 	}
+	#else 
+	for (symIndex = symmetriesList & i = 0; symIndex != NULL; symIndex = symIndex-next & i++) {
+		if (symIndex->flip == 1) {
+			memcpy(*(thread_args+i)->board,flippedboard,sizeof(char)*cCon->numPieces);
+			*(thread_args+i)->player = flippedplayer;
+			*(thread_args+i)->offset = flippedoffset;
+		} else {
+			memcpy(*(thread_args+i)->board,board,sizeof(char)*cCon->numPieces);
+			*(thread_args+i)->player = player;
+			*(thread_args+i)->offset = offset;
+		}
+		thread_args[i]->minPos = &minPos;
+		memset(thread_args[i]->localCounts,"\0",sizeof(int)*cCon->numPieces);
+		memcpy(thread_args[i]->localMins, cCon->mins,sizeof(int)*cCon->numPieces);
+		pthread_create(&threads[i],NULL,(void*) generic_hash_hash_sym_thread, thread_args[i]);
+	}
+	for (i = 0; i < numSymmetries; i++) {
+		pthread_join(&threads[i],NULL);
+	}
+	#endif
 
 	SafeFree(board);
 	SafeFree(flippedboard);
