@@ -513,6 +513,7 @@ POSITION hash_cruncher_sym_threads(char* board, struct symEntry* sym, int* count
 			i++;
 		}
 		for (k = 0; k < i; k++) {
+			max1 = 1;
 			if (mins[k] > 1) {
 				max1 = mins[k];
 			}
@@ -1302,11 +1303,12 @@ void generic_hash_init_sym(int boardType, int numRows, int numCols, int* reflect
 		SafeFree(tempSym);
 	}
 	//#ifdef PTHREAD
+	i = 0;
 	thread_args = SafeMalloc(sizeof(t_args_t *) * numSymmetries);
 	t_args_t* args;
 	pthread_mutex_init(&lock,NULL);
 	for (symIndex = symmetriesList; symIndex != NULL; symIndex = symIndex->next) {
-		args = SafeMalloc(sizeof(t_args_t));
+		args = (t_args_t*) SafeMalloc(sizeof(t_args_t));
 		args->board = SafeMalloc(sizeof(char)*cCon->boardSize);
 		args->sym = symIndex;
 		args->localCounts = SafeMalloc(sizeof(int)*cCon->numPieces);	
