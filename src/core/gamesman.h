@@ -18,11 +18,11 @@
 #include <fcntl.h>
 #include <stdarg.h>
 #include <errno.h>
+#include <pthread.h>
 
 #include <sys/time.h>
 #include <limits.h>
 #include "types.h"
-#include "transform.h"
 #include "hash.h"
 #include "hashwindow.h"
 #include "db.h"
