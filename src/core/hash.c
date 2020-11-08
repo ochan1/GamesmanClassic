@@ -440,6 +440,7 @@ void generic_hash_hash_sym_thread(t_args_t* args) {
 	pthread_mutex_lock(&lock);
 	if (*args->minPos == -1 || temp < *args->minPos) {
 		*args->minPos = temp;
+		//memcpy(cCon->)
 	}
 	pthread_mutex_unlock(&lock);
 }
@@ -563,10 +564,14 @@ char* generic_hash_unhash(POSITION hashed, char* dest)
 	j = searchOffset(hashed);
 	offst = cCon->hashOffset[j];
 	hashed -= offst;
+	int* gpd_src = gpd(cCon->offsetIndices[j+1] -1);
+	memcpy(cCon->localMins,cCon->mins,sizeof(int)*cCon->numPieces);
+	memcpy(cCon->thisCount,gpd_src, sizeof(int)*cCon->numPieces);
+	/*
 	for (i = 0; i < cCon->numPieces; i++) {
 		cCon->localMins[i] = cCon->mins[i];
 		cCon->thisCount[i] = gpd(cCon->offsetIndices[j + 1] - 1)[i];
-	}
+	} */
 	hash_uncruncher(hashed, dest);
 	return dest;
 }
