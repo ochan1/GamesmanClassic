@@ -21,7 +21,7 @@ AC_CONFIG_SRCDIR(src/core/gamesman.h)
 OUTLIBSUFFIX=".so"							# Shared library extension
 COMPILEGRAPHICS=""							# Whether we should build graphics
 OUTCFLAGS="$CFLAGS -Wall -DNDEBUG -g"		                        # Compiler flags
-OUTLDFLAGS=""								# Linker flags
+OUTLDFLAGS="-pthread"								# Linker flags
 OUTTCLCFLAGS=""								# Tcl-related compiler flags
 OUTTCLSOFLAGS=""							# Tcl-related linker flags (for shared objects)
 OUTTCLEXEFLAGS=""							# Tcl-related linker flags (for executables)

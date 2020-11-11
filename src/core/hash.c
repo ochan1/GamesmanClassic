@@ -116,7 +116,7 @@ void            hashtablePut(int, int, int);
 int         hashtableGet(int);
 void            freeHashtable();
 //#ifndef PTHREAD
-pthread_mutex_t lock;
+//pthread_mutex_t lock;
 typedef struct t_args {
 	char* board;
 	struct symEntry* sym;
@@ -124,7 +124,7 @@ typedef struct t_args {
 	POSITION offset;
 	int* localCounts;
 	int* localMins;
-	POSITION* minPos;
+	//POSITION* minPos;
 } t_args_t;
 t_args_t** thread_args;
 pthread_t* threads;
@@ -425,7 +425,7 @@ POSITION generic_hash_hash_sym(char* board, int player, POSITION offset, struct 
 void generic_hash_hash_sym_thread(t_args_t* args) {
 	int i,j;
 	POSITION temp;
-
+	POSITION minPos = -1;
 	for (i = 0; i < cCon->boardSize;i++) {
 		for (j = 0; j < cCon->numPieces;j++) {
 			if (args->board[args->sym->sym[i]] == cCon->pieces[j]) {
@@ -437,12 +437,13 @@ void generic_hash_hash_sym_thread(t_args_t* args) {
 	if (args->player == 0) {
 		temp += (args->player-1)*cCon->maxPos;
 	}
-	pthread_mutex_lock(&lock);
-	if (*args->minPos == -1 || temp < *args->minPos) {
-		*args->minPos = temp;
+	//pthread_mutex_lock(&lock);
+	if (minPos == -1 || temp < minPos) {
+		minPos = temp;
 		//memcpy(cCon->)
 	}
-	pthread_mutex_unlock(&lock);
+	//pthread_mutex_unlock(&lock);
+	pthread_exit((void*) minPos);
 }
 
 /* helper func from generic_hash_unhash() computes lexicographic rank of *board
@@ -1311,7 +1312,7 @@ void generic_hash_init_sym(int boardType, int numRows, int numCols, int* reflect
 	i = 0;
 	thread_args = SafeMalloc(sizeof(t_args_t *) * numSymmetries);
 	t_args_t* args;
-	pthread_mutex_init(&lock,NULL);
+	//pthread_mutex_init(&lock,NULL);
 	for (symIndex = symmetriesList; symIndex != NULL; symIndex = symIndex->next) {
 		args = (t_args_t*) SafeMalloc(sizeof(t_args_t));
 		args->board = SafeMalloc(sizeof(char)*cCon->boardSize);
@@ -1474,22 +1475,31 @@ POSITION generic_hash_canonicalPosition(POSITION pos) {
 	for (symIndex = symmetriesList; symIndex != NULL; symIndex = symIndex->next) {
 		args = thread_args[i];
 		if (symIndex->flip == 1) {
-			memcpy(args->board,flippedboard,sizeof(char)*cCon->numPieces);
+			memcpy(args->board,flippedboard,sizeof(char)*cCon->boardSize);
 			args->player = flippedplayer;
 			args->offset = flippedoffset;
 		} else {
-			memcpy(args->board,board,sizeof(char)*cCon->numPieces);
+			memcpy(args->board,board,sizeof(char)*cCon->boardSize);
 			args->player = player;
 			args->offset = offset;
 		}
-		args->minPos = &minPos;
+		//args->minPos = &minPos;
+		args->localCounts = realloc(args->localCounts,sizeof(int)*cCon->numPieces);
+		args->localMins = realloc(args->localMins,sizeof(int)*cCon->numPieces);
 		memset(args->localCounts,0,sizeof(int)*cCon->numPieces);
 		memcpy(args->localMins, cCon->mins,sizeof(int)*cCon->numPieces);
-		pthread_create(&threads[i],NULL,(void*) generic_hash_hash_sym_thread, args);
+		//pthread_create(&threads[i],NULL,(void*) generic_hash_hash_sym_thread, args);
 		i++;
 	}
 	for (i = 0; i < numSymmetries; i++) {
-		pthread_join(threads[i],NULL);
+		pthread_create(&threads[i],NULL,(void*) generic_hash_hash_sym_thread, thread_args[i]);
+	}	
+	void* t_min;
+	for (i = 0; i < numSymmetries; i++) {
+		pthread_join(threads[i],&t_min);
+		if (i == 0 || (POSITION) t_min < minPos) {
+			minPos = (POSITION) t_min;
+		} 
 	}
 	//#endif
 
@@ -1536,7 +1546,7 @@ void freeSymmetries() {
 	}
 	SafeFree(thread_args);
 	SafeFree(threads);
-	pthread_mutex_destroy(&lock);
+	////pthread_mutex_destroy(&lock);
 
 	// #endif
 }
