@@ -38,6 +38,9 @@
 #include "interact.h"
 #include "main.h"
 #include "seval.h"
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 
 /* For memory debugging */
 #include "memwatch.h"

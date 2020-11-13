@@ -51,6 +51,10 @@
 #define UNKNOWN -1
 #define RECT 0
 #define HEX 1
+#ifdef _OPENMP
+//Needed for iterating through symmetries for the parellel case
+struct symEntry** sym_arr;
+#endif
 /* Global Variables */
 struct hashContext **contextList = NULL;
 int hash_tot_context = 0, currentContext = 0;
@@ -1236,6 +1240,14 @@ void generic_hash_init_sym(int boardType, int numRows, int numCols, int* reflect
 		}
 		symIndex = symIndex->next;
 	}
+	#ifdef _OPENMP
+	sym_arr = malloc(sizeof(struct symEntry*)*numSymmetries-1);
+	symIndex = symmetriesList->next;
+	for (i = 0; i < numSymmetries-1;i ++) {
+		sym_arr[i] = symIndex;
+		symIndex = symIndex->next;
+	}
+	#endif
 
 	//printSymmetries(boardType);
 
@@ -1379,6 +1391,7 @@ POSITION generic_hash_canonicalPosition(POSITION pos) {
 	minPos = generic_hash_hash_sym(board, player, offset, symmetriesList);
 	// try each symmetry, keeping the lowest position hash
 	// returns as the canonical position.
+	#ifndef _OPENMP
 	while (symIndex != NULL) {
 		if (symIndex->flip == 1)
 			tempPos = generic_hash_hash_sym(flippedboard, flippedplayer, flippedoffset, symIndex);
@@ -1386,8 +1399,21 @@ POSITION generic_hash_canonicalPosition(POSITION pos) {
 			tempPos = generic_hash_hash_sym(board, player, offset, symIndex);
 		minPos = (tempPos < minPos) ? tempPos : minPos;
 		symIndex = symIndex->next;
-
 	}
+	#else
+	#pragma omp parallel for private(tempPos) shared(minPos)
+	for (i = 0; i < numSymmetries-1; i++) {
+		struct symEntry* sym_cur = sym_arr[i];
+		if (sym_cur->flip == 1) {
+			tempPos = generic_hash_hash_sym(flippedboard, flippedplayer, flippedoffset, sym_cur);
+		} else {
+			tempPos = generic_hash_hash_sym(board, player, offset, sym_cur);
+		}
+		#pragma omp critical 
+		minPos = tempPos < minPos ? tempPos : minPos;
+	} 
+	#endif
+	
 
 	SafeFree(board);
 	SafeFree(flippedboard);
@@ -1415,6 +1441,9 @@ void freeSymmetries() {
 		SafeFree(symIndex);
 		symIndex = tempNext;
 	}
+	#ifdef _OPENMP
+	free(sym_arr);
+	#endif
 }
 
 void generic_hash_add_sym(int* symToAdd) {
