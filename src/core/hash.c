@@ -103,12 +103,15 @@ void            freeHashContext(int contextNum);
 int             validConfig(int *t);
 int             searchIndices(int s);
 int             searchOffset(POSITION h);
+POSITION	combiCount_mp(int* tc, struct hashContext* con);
 POSITION        combiCount(int* tc);
 int             hash_countPieces(int *pA);
 POSITION        hash_cruncher (char* board);
+POSITION	hash_cruncher_sym_mp(char* board, struct symEntry* symIndex, struct hashContext* con);
 POSITION        hash_cruncher_sym (char* board, struct symEntry* symIndex);
 void            hash_uncruncher (POSITION hashed, char *dest);
 int             getPieceParams(int *pa,char *pi,int *mi,int *ma);
+POSITION	nCr_mp(int n, int r, struct hashContext* con);
 POSITION        nCr(int n, int r);
 void            nCr_init(int a);
 int*            gpd (int n);
@@ -382,6 +385,34 @@ POSITION generic_hash_hash(char* board, int player) {
 		return temp;
 	else return temp + (player-1)*(cCon->maxPos); //accomodates generic_hash_turn
 }
+POSITION generic_hash_hash_sym_mp(char* board, int player, POSITION offset, struct symEntry* symIndex,struct hashContext* con)
+{
+	int i, j;
+	POSITION temp;
+	int boardSize = con->boardSize; /*hash_boardSize;*/
+
+	if (symIndex == NULL)
+		ExitStageRightErrorString("Invalid symmetry");
+
+	for (i = 0; i < con->numPieces; i++)
+	{
+		con->thisCount[i] = 0;
+		con->localMins[i] = con->mins[i];
+	}
+
+	for (i = 0; i < boardSize; i++)
+	{
+		for (j = 0; j < con->numPieces; j++) {
+			if (board[symIndex->sym[i]] == con->pieces[j]) {
+				con->thisCount[j]++;
+			}
+		}
+	}
+	temp = offset + hash_cruncher_sym_mp(board, symIndex,con);
+	if (con->player != 0) // using single-player boards, ignore "player"
+		return temp;
+	else return temp + (player-1)*(con->maxPos); //accomodates generic_hash_turn
+}
 
 //accomodates generic_hash_turn and symmetries
 POSITION generic_hash_hash_sym(char* board, int player, POSITION offset, struct symEntry* symIndex)
@@ -412,7 +443,6 @@ POSITION generic_hash_hash_sym(char* board, int player, POSITION offset, struct 
 		return temp;
 	else return temp + (player-1)*(cCon->maxPos); //accomodates generic_hash_turn
 }
-
 /* helper func from generic_hash_unhash() computes lexicographic rank of *board
    among boards with the same configuration argument *thiscount */
 POSITION hash_cruncher (char* board)
@@ -443,7 +473,34 @@ POSITION hash_cruncher (char* board)
 
 	return sum;
 }
+POSITION hash_cruncher_sym_mp(char* board, struct symEntry* symIndex,struct hashContext* con)
+{
+	POSITION sum = 0;
+	int i = 0, k = 0, max1 = 0;
+	int boardSize = con->boardSize;
 
+	for(; boardSize>1; boardSize--) {
+		i = 0;
+
+		while (board[symIndex->sym[boardSize - 1]] != con->pieces[i])
+			i++;
+		for (k = 0; k < i; k++) {
+			max1 = 1;
+			if (con->localMins[k] > 1)
+				max1 = con->localMins[k];
+
+			if (con->thisCount[k] >= max1) {
+				con->thisCount[k]--;
+				sum += combiCount_mp(con->thisCount,con);
+				con->thisCount[k]++;
+			}
+		}
+		con->thisCount[i]--;
+		con->localMins[i]--;
+	}
+
+	return sum;
+}
 // symmetry version
 POSITION hash_cruncher_sym (char* board, struct symEntry* symIndex)
 {
@@ -473,7 +530,6 @@ POSITION hash_cruncher_sym (char* board, struct symEntry* symIndex)
 
 	return sum;
 }
-
 /* tells whose move it is, given a board's hash number */
 int generic_hash_turn (POSITION hashed)
 {
@@ -781,6 +837,19 @@ int searchOffset(POSITION h)
 		i--;
 	return i;
 }
+POSITION combiCount_mp(int* tc,struct hashContext* con)
+{
+	POSITION sum = 0, prod = 1, ind = 0,old=1,hold=0;
+	for (ind = 0; ind < con->numPieces - 1; ind++) {
+		sum += tc[ind];
+		hold = nCr_mp(sum+tc[ind+1], sum,con);
+		prod *= hold;
+		if(prod/hold !=  old)
+			ExitStageRightErrorString("Combination Calculation Wraps");
+		old = prod;
+	}
+	return prod;
+}
 
 /* helper function used to find n choose (t1,t2,t3,...,tn) where the ti's are
    the members of *tc */
@@ -797,7 +866,6 @@ POSITION combiCount(int* tc)
 	}
 	return prod;
 }
-
 
 
 
@@ -846,13 +914,15 @@ int gpi (int n)
 {
 	return (cCon->pieceIndices)[n];
 }
-
+POSITION nCr_mp(int n, int r,struct hashContext* con)
+{
+	return con->NCR[n*(con->boardSize+1) + r];
+}
 /* shorthand for n choose r */
 POSITION nCr(int n, int r)
 {
 	return cCon->NCR[n*(cCon->boardSize+1) + r];
 }
-
 void generic_hash_destroy()
 {
 	int i;
@@ -1388,10 +1458,10 @@ POSITION generic_hash_canonicalPosition(POSITION pos) {
 		flippedoffset = cCon->hashOffset[searchIndices(flippedsum)];
 	}
 
-	minPos = generic_hash_hash_sym(board, player, offset, symmetriesList);
 	// try each symmetry, keeping the lowest position hash
 	// returns as the canonical position.
 	#ifndef _OPENMP
+	minPos = generic_hash_hash_sym(board, player, offset, symmetriesList);
 	while (symIndex != NULL) {
 		if (symIndex->flip == 1)
 			tempPos = generic_hash_hash_sym(flippedboard, flippedplayer, flippedoffset, symIndex);
@@ -1401,13 +1471,20 @@ POSITION generic_hash_canonicalPosition(POSITION pos) {
 		symIndex = symIndex->next;
 	}
 	#else
-	#pragma omp parallel for private(tempPos) shared(minPos)
+	struct hashContext con;
+	int t_count[cCon->numPieces];
+	int t_mins[cCon->numPieces];
+	minPos = generic_hash_hash_sym_mp(board, player, offset, symmetriesList,cCon);
+	#pragma omp parallel for private(tempPos,con,t_count,t_mins) shared(minPos) 
 	for (i = 0; i < numSymmetries-1; i++) {
+		con = *cCon;
+		con.thisCount = t_count;
+		con.localMins = t_mins;
 		struct symEntry* sym_cur = sym_arr[i];
 		if (sym_cur->flip == 1) {
-			tempPos = generic_hash_hash_sym(flippedboard, flippedplayer, flippedoffset, sym_cur);
+			tempPos = generic_hash_hash_sym_mp(flippedboard, flippedplayer, flippedoffset, sym_cur,&con);
 		} else {
-			tempPos = generic_hash_hash_sym(board, player, offset, sym_cur);
+			tempPos = generic_hash_hash_sym_mp(board, player, offset, sym_cur,&con);
 		}
 		#pragma omp critical 
 		minPos = tempPos < minPos ? tempPos : minPos;
