@@ -99,7 +99,8 @@ VALUE       db_original_put_value(POSITION pos, VALUE data);
 /* General */
 void            CreateDatabases         ();
 void            InitializeDatabases     ();
-void            DestroyDatabases    ();
+BOOLEAN         ReinitializeTierDB      ();
+void            DestroyDatabases        ();
 
 
 UINT64

@@ -999,7 +999,7 @@ void PrintPosition (POSITION position, STRING playersName, BOOLEAN usersTurn) {
 		else
 			printf("O has %d on the board\n", numo);
 
-		printf("          6 -- 7 -- 8    %c -- %c -- %c   |    \n\n", board[6], board[7], board[8]);
+		printf("          6 -- 7 -- 8    %c -- %c -- %c   |    %s\n\n", board[6], board[7], board[8], GetPrediction(position, playersName, usersTurn));
 
 
 	}
@@ -1058,13 +1058,13 @@ void PrintPosition (POSITION position, STRING playersName, BOOLEAN usersTurn) {
 		else
 			printf("O has %d on the board\n", numo);
 		printf("        |   |   |       |   |   |       |   |   |       |   |   |\n");
-		printf("LEGEND: 9 - 10- 11      12- 13- 14      %c - %c - %c       %c - %c - %c    Turn: %c\n", board[9], board[10], board[11], board[12], board[13], board[14], turn);
+		printf("LEGEND: 9 - 10- 11      12- 13- 14      %c - %c - %c       %c - %c - %c\n", board[9], board[10], board[11], board[12], board[13], board[14]);
 		printf("        |   |   |       |   |   |       |   |   |       |   |   |\n");
 		printf("        |   |   15- 16- 17  |   |       |   |   %c - %c - %c   |   |\n", board[15], board[16], board[17] );
 		printf("        |   |       |       |   |       |   |       |       |   |\n");
 		printf("        |   18 ---- 19 ---- 20  |       |   %c ----- %c ----- %c   |\n", board[18], board[19], board[20] );
 		printf("        |           |           |       |           |           |\n");
-		printf("        21 -------- 22 -------- 23      %c --------- %c --------- %c\n\n", board[21], board[22], board[23] );
+		printf("        21 -------- 22 -------- 23      %c --------- %c --------- %c    %s\n\n", board[21], board[22], board[23], GetPrediction(position, playersName, usersTurn) );
 
 	}
 	SafeFree(board);
@@ -1084,7 +1084,13 @@ void PrintPosition (POSITION position, STRING playersName, BOOLEAN usersTurn) {
 
 void PrintComputersMove (MOVE computersMove, STRING computersName) {
 	STRING str = MoveToString( computersMove );
-	printf("%8s's move                                     : %s\n",computersName,str);
+	if (gameType == 3) {
+		printf("%8s's Move                                     :    %s\n",computersName,str);
+	} else if (gameType == 6) {
+		printf("%8s's Move                                :    %s\n",computersName,str);
+	} else {
+		printf("%8s's Move                                                 :    %s\n",computersName,str);
+	}
 	SafeFree( str );
 }
 
@@ -1125,23 +1131,20 @@ STRING MoveToString(MOVE move) {
 		toIdx = fromIdx;
 		fromIdx = 31;
 	}
-	int tier, piecesLeft;
 
 	STRING movestring;
-	//tier = generic_hash_cur_context();
-	//piecesLeft = tier / 100;
 	if (fromIdx != 31 && toIdx != 31 && removeIdx != 31) {
 		movestring = (STRING) SafeMalloc(12);
-		sprintf( movestring, "[%d-%dr%d]",fromIdx, toIdx, removeIdx);
+		sprintf( movestring, "%d-%dr%d",fromIdx, toIdx, removeIdx);
 	} else if (fromIdx != 31 && toIdx != 31 && removeIdx == 31) {
 		movestring = (STRING) SafeMalloc(8);
-		sprintf( movestring, "[%d-%d]", fromIdx, toIdx);
+		sprintf( movestring, "%d-%d", fromIdx, toIdx);
 	} else if (fromIdx == 31 && toIdx != 31 && removeIdx == 31) {//if 1st == 2nd position in move formula
 		movestring = (STRING) SafeMalloc(8);
-		sprintf(movestring, "[%d]", toIdx);
+		sprintf(movestring, "%d", toIdx);
 	} else {
 		movestring = (STRING) SafeMalloc(8);
-		sprintf(movestring, "[%dr%d]", toIdx, removeIdx);
+		sprintf(movestring, "%dr%d", toIdx, removeIdx);
 	}
 
 	return movestring;
@@ -1189,22 +1192,31 @@ USERINPUT GetAndPrintPlayersMove (POSITION position, MOVE *move, STRING playersN
 
 	do {
 		int maxslots = ((gameType == 3) ? 8 : (gameType == 6) ? 15 : 23);
-		printf("%8s's move: (u)ndo", playersName);
+		int spacemaxslots = (gameType == 3) ? 1 : 2;
+		printf("%8s's Move: (u)ndo", playersName);
+		int numSpaces = (gameType == 9) ? 41 : 24;
 		if (!allRemoves) {
-			if (piecesLeft != 0) // STAGE 1 : PLACING
-				printf(" OR [0-%d]", maxslots);
-			else {
-				printf(" OR [0-%d]-[0-%d]", maxslots, maxslots);
+			if (piecesLeft != 0) {// STAGE 1 : PLACING
+				printf("/[0-%d]", maxslots);
+				numSpaces -= (5 + spacemaxslots);
+			} else {
+				printf("/[0-%d]-[0-%d]", maxslots, maxslots);
+				numSpaces -= (10 + spacemaxslots * 2);
 			}
 		}
 		if (existsRemoves) {
-			if (piecesLeft != 0) // STAGE 1 : PLACING
-				printf(" OR [0-%d]r[0-%d]", maxslots, maxslots);
-			else {
-				printf(" OR [0-%d]-[0-%d]r[0-%d]", maxslots, maxslots, maxslots);
+			if (piecesLeft != 0) {// STAGE 1 : PLACING
+				printf("/[0-%d]r[0-%d]", maxslots, maxslots);
+				numSpaces -= (10 + spacemaxslots * 2);
+			} else {
+				printf("/[0-%d]-[0-%d]r[0-%d]", maxslots, maxslots, maxslots);
+				numSpaces -= (15 + spacemaxslots * 3);
 			}
 		}
-		printf(": ");
+		for (int i = 0; i < numSpaces; i++) {
+			printf(" ");
+		}
+		printf(":    ");
 
 		input = HandleDefaultTextInput(position, move, playersName);
 
@@ -2139,7 +2151,7 @@ POSITION InteractStringToPosition(STRING board) {
 	int i = 0;
 	for (i = 0; i < BOARDSIZE; i++) {
         if (board[i] == ' ') {
-			realBoard[i] = '.';
+			realBoard[i] = BLANK;
     	} else {
 		    realBoard[i] = board[i];
         }
