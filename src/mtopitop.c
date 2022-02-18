@@ -296,31 +296,31 @@ void countPiecesOnBoard(char *board, int *bb, int *rb, int *bs, int *rs, int *bc
 	for (int i = 0; i < 9; i++) {
 		switch(board[i]) {
 			case BLUEBUCKETPIECE:
-				*bb++;
+				(*bb)++;
 				break;
 			case REDBUCKETPIECE:
-				*rb++;
+				(*rb)++;
 				break;
 			case BLUESMALLPIECE:
-				*bs++;
+				(*bs)++;
 				break;
 			case REDSMALLPIECE:
-				*rs++;
+				(*rs)++;
 				break;
 			case BLUECASTLEPIECE:
-				*bc++;
+				(*bc)++;
 				break;
 			case REDCASTLEPIECE:
-				*rc++;
+				(*rc)++;
 				break;
 			case SMALLPIECE:
-				*s++;
+				(*s)++;
 				break;
 			case LARGEPIECE:
-				*l++;
+				(*l)++;
 				break;
 			case CASTLEPIECE:
-				*c++;
+				(*c)++;
 				break;
 			default:
 				break;
@@ -690,6 +690,10 @@ MOVELIST *GenerateMoves(POSITION position) {
 	int blueLeft, redLeft, smallLeft, largeLeft;
 	char *board = unhashPosition(position, &turn, &prevMove, &blueLeft, &redLeft, &smallLeft, &largeLeft);
 
+	char prevPiece;
+	int prevFrom, prevTo;
+	unhashMove(prevMove, &prevPiece, &prevFrom, &prevTo);
+
 	for (int to = 0; to < 9; to++) {
 		if (board[to] == BLANKPIECE) {
 	
@@ -705,10 +709,9 @@ MOVELIST *GenerateMoves(POSITION position) {
 			// SLIDE TO BLANK //
 			for (int j = 0; j < numAdjacencies[to]; j++) {
 				int from = adjacencyMatrix[to][j];
-				if ((turn == BLUE && board[from] != BLANKPIECE && board[from] != REDBUCKETPIECE && board[from] != REDSMALLPIECE && board[from] != REDCASTLEPIECE) || (turn == RED && board[from] != BLANKPIECE && board[from] != BLUEBUCKETPIECE && board[from] != BLUESMALLPIECE && board[from] != BLUECASTLEPIECE)) {
-					MOVE toAdd = hashMove(ANYPIECE, from, to);
-					if (toAdd != prevMove)
-						moveList = CreateMovelistNode(toAdd, moveList);
+				if (to != prevFrom || from != prevTo) { // Don't undo previous person's slide
+					if ((turn == BLUE && board[from] != BLANKPIECE && board[from] != REDBUCKETPIECE && board[from] != REDSMALLPIECE && board[from] != REDCASTLEPIECE) || (turn == RED && board[from] != BLANKPIECE && board[from] != BLUEBUCKETPIECE && board[from] != BLUESMALLPIECE && board[from] != BLUECASTLEPIECE))
+						moveList = CreateMovelistNode(hashMove(ANYPIECE, from, to), moveList);
 				}
 			}
 		} else if (board[to] == SMALLPIECE || board[to] == CASTLEPIECE) { // SLIDE ONTO SMALL PIECE OR CASTLE PIECE //
