@@ -587,7 +587,7 @@ VALUE Primitive(POSITION position) {
 	int bb, rb, bs, rs, bc, rc, s, l, c;
 	countPiecesOnBoard(board, &bb, &rb, &bs, &rs, &bc, &rc, &s, &l, &c);
 	SafeFree(board);
-	if (bc == 2 || rc == 2) return lose;
+	if ((bc == 2 || rc == 2) || GenerateMoves(position) == NULL) return lose;
 	return undecided;
 }
 
@@ -692,7 +692,7 @@ MOVELIST *GenerateMoves(POSITION position) {
 
 	for (int to = 0; to < 9; to++) {
 		if (board[to] == BLANKPIECE) {
-
+	
 			// PLACEMENT //
 			if (blueLeft > 0 && turn == BLUE)
 				moveList = CreateMovelistNode(hashMove(BLUEBUCKETPIECE, to, to), moveList);
@@ -705,10 +705,10 @@ MOVELIST *GenerateMoves(POSITION position) {
 			// SLIDE TO BLANK //
 			for (int j = 0; j < numAdjacencies[to]; j++) {
 				int from = adjacencyMatrix[to][j];
-				if ((turn == BLUE && board[from] != REDBUCKETPIECE && board[from] != REDSMALLPIECE && board[from] != REDCASTLEPIECE) || (turn == RED && board[from] == BLUEBUCKETPIECE && board[from] == BLUESMALLPIECE && board[from] == BLUECASTLEPIECE)) {
+				if ((turn == BLUE && board[from] != BLANKPIECE && board[from] != REDBUCKETPIECE && board[from] != REDSMALLPIECE && board[from] != REDCASTLEPIECE) || (turn == RED && board[from] != BLANKPIECE && board[from] != BLUEBUCKETPIECE && board[from] != BLUESMALLPIECE && board[from] != BLUECASTLEPIECE)) {
 					MOVE toAdd = hashMove(ANYPIECE, from, to);
 					if (toAdd != prevMove)
-						CreateMovelistNode(toAdd, moveList);
+						moveList = CreateMovelistNode(toAdd, moveList);
 				}
 			}
 		} else if (board[to] == SMALLPIECE || board[to] == CASTLEPIECE) { // SLIDE ONTO SMALL PIECE OR CASTLE PIECE //
