@@ -4,10 +4,9 @@
 **
 ** DESCRIPTION: Topitop
 **
-** AUTHOR:      
+** AUTHOR:      Matthew Yu and Cameron Cheung
 **
-** DATE:        BEGIN: 02/20/2006
-**	              END: 04/09/2006
+** DATE:        February 2022
 **
 **************************************************************************/
 
@@ -86,17 +85,21 @@ int idsToMoves[2][41] = {
 	{0, 1, 3, 4, 0, 2, 3, 4, 5, 1, 4, 5, 0, 1, 4, 6, 7, 0, 1, 2, 3, 5, 6, 7, 8, 1, 2, 4, 7, 8, 3, 4, 7, 3, 4, 5, 6, 8, 4, 5, 7}
 };
 
-STRING kAuthorName = "";
+STRING kAuthorName = "Matthew Yu and Cameron Cheung";
 STRING kGameName = "Topitop";
 STRING kDBName = "topitop";   /* The name to store the database under */
 BOOLEAN kPartizan = TRUE;
 BOOLEAN kDebugMenu = FALSE;
-BOOLEAN kGameSpecificMenu = FALSE;
+BOOLEAN kGameSpecificMenu = TRUE;
 BOOLEAN kTieIsPossible = FALSE;
 BOOLEAN kLoopy = TRUE;
 BOOLEAN kDebugDetermineValue = FALSE;
 BOOLEAN kSupportsSymmetries = TRUE; /* Whether we support symmetries */
 void* gGameSpecificTclInit = NULL;
+
+BOOLEAN tyingRule = FALSE;
+VALUE ifNoLegalMoves = undecided;
+BOOLEAN isMisere = FALSE;
 
 STRING kHelpGraphicInterface = "";
 
@@ -793,6 +796,90 @@ MOVE hashMove(char piece, int from, int to) {
 ************************************************************************/
 
 void GameSpecificMenu() {
+	char GetMyChar();
+
+	do {
+		printf("\n\t----- Game-specific options for %s -----\n\n\n", kGameName);
+
+		if (tyingRule == FALSE && ifNoLegalMoves == undecided && isMisere == FALSE) {
+			printf("\tCurrently using default (Variant 0) rules.\n");
+		} else {
+			printf("\tCurrently using rules for Variant %d.\n", getOption());
+		}
+
+		printf("\n\ts)\tIf no legal moves: change from %s to %s.\n", (ifNoLegalMoves == undecided) ? "PASS TURN" : "IMMEDIATE LOSS", (ifNoLegalMoves == undecided) ? "IMMEDIATE LOSS" : "PASS TURN");
+		printf("\n\tt)\tTwo-tower tying rule: change from %s to %s.\n", (tyingRule) ? "ON" : "OFF", (tyingRule) ? "OFF" : "ON");
+		printf("\n\tm)\tChange from %sMISERE to %sMISERE.\n", (isMisere) ? "" : "NON-", (isMisere) ? "NON-" : "");
+		printf("\n\tb)\tBack = Return to previous activity.\n");
+		printf("\n\nSelect an option: ");
+
+		switch(GetMyChar()) {
+		case 'S': case 's':
+			ifNoLegalMoves = (ifNoLegalMoves == undecided) ? lose : undecided;
+			break;
+		case 'T': case 't':
+			tyingRule = !tyingRule;
+			break;
+		case 'M': case 'm':
+			isMisere = !isMisere;
+			break;
+		case 'B': case 'b': case 'Q': case 'q':
+			return;
+		default:
+			printf("\nSorry, I don't know that option. Try another.\n");
+			HitAnyKeyToContinue();
+			break;
+		}
+	} while(TRUE);
+}
+
+/************************************************************************
+**
+** NAME:        NumberOfOptions
+**
+** DESCRIPTION: Calculates and returns the number of variants
+**              your game supports.
+**
+** OUTPUTS:     int : Number of Game Variants
+**
+************************************************************************/
+
+int NumberOfOptions() {
+	return 8;
+}
+
+
+/************************************************************************
+**
+** NAME:        getOption
+**
+** DESCRIPTION: A hash function that returns a number corresponding
+**              to the current variant of the game.
+**              Each set of variants needs to have a different number.
+**
+** OUTPUTS:     int : the number representation of the options.
+**
+************************************************************************/
+
+int getOption() {
+	return (isMisere << 2) | (tyingRule << 1) | (ifNoLegalMoves == lose);
+}
+
+/************************************************************************
+**
+** NAME:        setOption
+**
+** DESCRIPTION: The corresponding unhash function for game variants.
+**              Unhashes option and sets the necessary variants.
+**
+** INPUT:       int option : the number representation of the options.
+**
+************************************************************************/
+
+void setOption(int option) {
+	ifNoLegalMoves = (option & 0b1) ? lose : undecided;
+	tyingRule = (option & 0b10) ? TRUE : FALSE;
+	isMisere = (option & 0b100) ? TRUE : FALSE;
 }
 
 /************************************************************************
@@ -945,8 +1032,67 @@ VALUE Primitive(POSITION position) {
 	char *board = unhashPosition(position, &turn, &disallowedMove, &blueLeft, &redLeft, &smallLeft, &largeLeft);
 	int bb, rb, bs, rs, bc, rc, s, l, c;
 	countPiecesOnBoard(board, &bb, &rb, &bs, &rs, &bc, &rc, &s, &l, &c);
+	
+	if (bc == 2 || rc == 2) {
+		if (!tyingRule) {
+			SafeFree(board);
+			return (isMisere) ? win : lose;
+		} else {
+			if (bc == 2 && rc == 1) {
+				for (int i = 0; i < 9; i++) {
+					if (board[i] == REDBUCKETPIECE) { // Check if red bucket piece is next to castle piece.
+						for (int j = 0; j < numAdjacencies[i]; j++) {
+							if (board[adjacencyMatrix[i][j]] == CASTLEPIECE) {
+								SafeFree(board);
+								return tie;
+							}
+						}
+					} else if (board[i] == REDSMALLPIECE) { // Check if red small piece is next to large piece.
+						for (int j = 0; j < numAdjacencies[i]; j++) {
+							if (board[adjacencyMatrix[i][j]] == LARGEPIECE) {
+								SafeFree(board);
+								return tie;
+							}
+						}
+					}
+				}
+				SafeFree(board);
+				return (isMisere) ? win : lose;
+
+			} else if (rc == 2 && bc == 1) {
+				for (int i = 0; i < 9; i++) {
+					if (board[i] == BLUEBUCKETPIECE) { // Check if blue bucket piece is next to castle piece.
+						for (int j = 0; j < numAdjacencies[i]; j++) {
+							if (board[adjacencyMatrix[i][j]] == CASTLEPIECE) {
+								SafeFree(board);
+								return tie;
+							}
+						}
+					} else if (board[i] == BLUESMALLPIECE) { // Check if blue small piece is next to large piece.
+						for (int j = 0; j < numAdjacencies[i]; j++) {
+							if (board[adjacencyMatrix[i][j]] == LARGEPIECE) {
+								SafeFree(board);
+								return tie;
+							}
+						}
+					}
+				}
+				SafeFree(board);
+				return (isMisere) ? win : lose;
+			}
+			SafeFree(board);
+			return (isMisere) ? win : lose;
+		}
+	}
 	SafeFree(board);
-	if (bc == 2 || rc == 2) return lose;
+	if (ifNoLegalMoves == lose) {
+		MOVELIST *moveList = GenerateMoves(position);
+		if (moveList->move == NULLMOVE) {
+			FreeMoveList(moveList);
+			return (isMisere) ? win : lose;
+		}
+		FreeMoveList(moveList);
+	}
 	return undecided;
 }
 
@@ -956,7 +1102,7 @@ VALUE Primitive(POSITION position) {
 **
 **     *-------*-------*-------*
 **     |   B   |       |       |  Turn: Blue
-**     |  /_\  |       |       |  Previous Move: 3-4
+**     |  /_\  |       |       |  Disallowed Move: [4-3]
 **     | /___\ |  /_\  |   R   |
 **     *-------+-------+-------*  Remaining Pieces to Place:
 **     |       |       |       |  Blue Bucket (0)
@@ -1106,7 +1252,7 @@ POSITION GetCanonicalPosition(POSITION position) {
 	char *originalBoard = unhashPosition(position, &turn, &disallowedMove, &blueLeft, &redLeft, &smallLeft, &largeLeft);
 
 	char canonBoard[9];
-	int canonDisallowedMove;
+	int canonDisallowedMove = disallowedMove;
     POSITION canonPos = position;
     int bestSymmetryNum = 0;
 
@@ -1114,9 +1260,8 @@ POSITION GetCanonicalPosition(POSITION position) {
         for (int i = 0; i < 9; i++) {
             char pieceInSymmetry = originalBoard[symmetriesToUse[symmetryNum][i]];
             char pieceInBest = originalBoard[symmetriesToUse[bestSymmetryNum][i]];
-            if (pieceInSymmetry != pieceInBest) {
-                if (pieceInSymmetry > pieceInBest) // If new smallest hash.
-                    bestSymmetryNum = symmetryNum;
+            if (pieceInSymmetry > pieceInBest) {
+                bestSymmetryNum = symmetryNum;
                 break;
             }
         };
@@ -1130,7 +1275,9 @@ POSITION GetCanonicalPosition(POSITION position) {
         canonBoard[i] = originalBoard[symmetriesToUse[bestSymmetryNum][i]];
 	}
 	
-	canonDisallowedMove = movesToIds[symmetriesToUse[bestSymmetryNum][idsToMoves[0][disallowedMove]]][symmetriesToUse[bestSymmetryNum][idsToMoves[1][disallowedMove]]];
+	if (disallowedMove != 0) { // Transform disallowed move.
+		canonDisallowedMove = movesToIds[symmetriesToUse[bestSymmetryNum][idsToMoves[0][disallowedMove]]][symmetriesToUse[bestSymmetryNum][idsToMoves[1][disallowedMove]]];
+	}
 
     canonPos = hashPosition(canonBoard, turn, canonDisallowedMove);
 	
@@ -1193,7 +1340,7 @@ USERINPUT GetAndPrintPlayersMove(POSITION position, MOVE *move, STRING playerNam
 
 BOOLEAN ValidTextInput(STRING input) {
 	return (input[0] >= 48 && input[0] <= 56 && input[1] == '-' && input[2] >= 48 && input[2] <= 56 && input[3] == '\0') || // Movement
-			((input[0] == 'B' || input[0] == 'R' || input[0] == 'S' || input[0] == 'L') && input[1] >= 48 && input[1] <= 56 && input[2] == '\0') || // Placement
+			((input[0] == 'B' || input[0] == 'R' || input[0] == 'S' || input[0] == 'L' || input[0] == 'b' || input[0] == 'r' || input[0] == 's' || input[0] == 'l') && input[1] >= 48 && input[1] <= 56 && input[2] == '\0') || // Placement
 			strcmp(input, "None") == 0; // Pass Turn
 }
 
@@ -1213,20 +1360,20 @@ MOVE ConvertTextInputToMove(STRING input) {
 	char piece = BLUEBUCKETPIECE;
 	if (input[0] >= 48 && input[0] <= 56) {// Movement
 		return hashMove(piece, input[0] - '0', input[2] - '0');
-	} else if (input[0] == 'N') {
+	} else if (input[0] == 'N' || input[0] == 'n') {
 		return NULLMOVE;
 	} else {
 		switch(input[0]) {
-			case 'B':
+			case 'B': case 'b':
 				piece = BLUEBUCKETPIECE;
 				break;
-			case 'R':
+			case 'R': case 'r':
 				piece = REDBUCKETPIECE;
 				break;
-			case 'S':
+			case 'S': case 's':
 				piece = SMALLPIECE;
 				break;
-			case 'L':
+			case 'L': case 'l':
 				piece = LARGEPIECE;
 				break;
 			default:
@@ -1290,17 +1437,6 @@ STRING MoveToString(MOVE move) {
 		sprintf(moveString, "[%d-%d]", from, to);
 		return moveString;
 	}
-}
-
-int NumberOfOptions() {
-	return 1;
-}
-
-int getOption() {
-	return 0;
-}
-
-void setOption(int option) {
 }
 
 POSITION InteractStringToPosition(STRING board) {
