@@ -2,7 +2,7 @@
 #include "memory.h"
 #include "solver.h"
 
-#define shardsize 28
+#define SHARDSIZE 28
 
 typedef struct shardgraph {
 	gamehash minhash;
@@ -18,7 +18,7 @@ static int initializeshard(shardgraph* shardlist, char* shardinitialized, uint32
 //Initializes all relevant shards. Returns the number of shards actually created.
 static int initializeshardlist(shardgraph* shardlist, uint32_t shardcount) {
 	char* shardinitialized = calloc(shardcount, sizeof(char));
-	uint32_t startingshard = getHash(getStartingPositions()) >> shardsize;
+	uint32_t startingshard = getHash(getStartingPositions()) >> SHARDSIZE;
 	int validshards = initializeshard(shardlist, shardinitialized, shardcount, startingshard);
 }
 static void freeshardlist(shardgraph* shardlist, uint32_t shardcount) {
@@ -34,7 +34,7 @@ int main(int argc, char** argv)
 		return 1;
 	}
   	initialize_constants();
-	uint32_t shardcount = 1 << (hashLength() - shardsize);
+	uint32_t shardcount = 1 << (hashLength() - SHARDSIZE);
 	shardgraph* shardList = calloc(shardcount, sizeof(shardgraph));
 	int validshards = initializeshardlist(shardList, shardcount);
 	freeshardlist();
