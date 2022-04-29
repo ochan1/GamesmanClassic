@@ -30,19 +30,20 @@ int discoverfragment(char* workingfolder, uint64_t* parentshards, int numParents
 	Game g;
 	game newg;
 	gamehash h;
+	gamehash minindex = maxHash();
+	gamehash maxindex = 0;
 	char primitive;
 
 	int index = 0;
 
 	// Next Tier: Use CUDA Malloc when moving to GPU for "moves" and "fringe"
+	solverdata* primitives = initializesolverdata(hashLength());
 	char moves[getMaxMoves()];
 	game* fringe = calloc(sizeof(game), getMaxMoves() * getMaxDepth());
-	if(fringe == NULL) {
+	if (primitives == NULL || fringe == NULL) {
 		printf("Memory allocation error\n");
 		return 1;
 	}
-
-	int movecount, i;
 
 	// Add incoming Discovery states from parent
 	// Multiple top node in shard
@@ -51,33 +52,82 @@ int discoverfragment(char* workingfolder, uint64_t* parentshards, int numParents
 		GET_DISCOVERY_STATES_FROM_SHARD(&fringe, &index, parentshards[i]);
 	}
 
-	while (index > 0) {
-		// Pop from fringe
-		g = fringe[index--];
-
-		movecount = generateMoves((char*) &moves, g);
-		for (i = 0; i < movecount; i++) {
-			newg = doMove(g, moves[i]);
-			h = getHash(newg);
-
-			// "isPrimitive" returns game status
-			primitive = isPrimitive(newg, moves[i]);
-
-			if (primitive != (char) NOT_PRIMITIVE) {
-				// Terminal state with win, loss, or tie
-				SAVE_INTO_SOLVER(h, primitive); // TODO
-			} else {
-				if ((h >> fragmentsize) == currentshard) {
-					// Still in current shard, ready to process next
-					fringe[index++] = newg;
+	int movecount, i, minprimitive, oldindex;
+	while (index) {
+		minprimitive = 255;
+		oldindex = index;
+		g = fringe[index - 1];
+		h = getHash(g);
+		if (solverread(primitives, h) == 0) {
+			movecount = generateMoves((char*) &moves, g);
+			for (i = 0; i < movecount; i++) {
+				newg = doMove(g, moves[i]);
+				h = getHash(newg);
+				// Was this state previously sovled?
+				primitive = solverread(primitives, h);
+				if (!primitive) {
+					// "isPrimitive" returns game status
+					primitive = isPrimitive(newg, moves[i]);
+					if (primitive != (char)NOT_PRIMITIVE) {
+						// Terminal state with win, loss, or tie
+						solverinsert(primitives, h, primitive);
+						if (h < minindex) {
+							minindex = h;
+						}
+						if (h > maxindex) {
+							maxindex = h;
+						}
+						// printf("Position 0x%08x determined primitive\n", newg);
+						positionsfound[primitive]++;
+						minprimitive = minprimitive <= primitive ? minprimitive : primitive;
+					} else {
+						if ((h >> fragmentsize) == currentshard) {
+							// Still in current shard, ready to process next
+							fringe[index++] = newg;
+						} else {
+							// Send to child
+							// TODO
+							DETERMINE_AND_SEND_TO_CHILD(childrenshards, childrenshardcount, newg, workingfolder);
+						}
+					}
 				} else {
-					// Send to child
-					// TODO
-					DETERMINE_AND_SEND_TO_CHILD(childrenshards, childrenshardcount, newg, workingfolder);
+					minprimitive = minprimitive <= primitive ? minprimitive : primitive;
 				}
 			}
+			if (index == oldindex) {
+				if (minprimitive & 128) {
+					minprimitive = (minprimitive & 64) ? (257 - minprimitive) : (minprimitive + 1);
+				} else {
+					minprimitive = 255 - minprimitive;
+				}
+				h = getHash(g);
+				solverinsert(primitives, h, minprimitive);
+				if (h < minindex) minindex = h;
+				if (h > maxindex) maxindex = h;
+				// printf("Position 0x%08x determined fully\n", g);
+				positionsfound[minprimitive]++;
+				index--;
+			}
+		} else {
+			index--;
 		}
 	}
+	// TODO any way to save the data without this loop ... seems kinda wasteful
+	int totalpositioncount = 0;
+	for (int i = 1; i < 64; i++) {
+		if (positionsfound[i]) printf("Loss in %d: %d\n", i - 1, positionsfound[i]);
+		totalpositioncount += positionsfound[i];
+	}
+	for(int i = 128; i < 192; i++) {
+		if (positionsfound[i]) printf("Tie in %d: %d\n", i - 128, positionsfound[i]);
+		totalpositioncount += positionsfound[i];
+	}
+	for(int i = 254; i >= 192; i--) {
+		if (positionsfound[i]) printf("Win in %d: %d\n", 255 - i, positionsfound[i]);
+		totalpositioncount += positionsfound[i];
+	}
+	// ^^^^^^^^^^^^^^^
+
 	return 0;
 }
 
