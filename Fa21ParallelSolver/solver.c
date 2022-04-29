@@ -1,23 +1,104 @@
 #include "Game.h"
 #include "memory.h"
+#include <stdio.h>
+#include <stdlib.h>
 
-void discoverfragment(char** inputfiles, char* outputfolder, gamehash minhash, char fragmentsize) {
+/*
+This one is same as discover fragment, but without a starting file
+Especially for root node of game tree
+*/
+void discoverstartingfragment(char* workingfolder, char fragmentsize) {
 
 }
 
-void solvefragment(char* inputfile, char* solvedfragmentfolder, gamehash minhash, char fragmentsize)
-{
-  /*gamehash* childrenshards;
-  int shardcount = getchildrenshards(&childrenshards, fragmentsize, minhash);
-  //Load solved fragments into array on GPU
-  //Load list of target hashes into array on GPU
-  //Create a new solver on GPU
-  for(int i = ; i >= ; i--) // First two values in input file contain the max and min depth
-  {
-  	  //GPU runs one tier of the solver
-  }
-  //Collect the data from the GPU
-  //Compress and save the shard into solvedfragmentfolder*/
+/*
+Downward Traversal
+
+workingfolder - save the child discovery and my solves to
+parentshards - Shards of my parents
+numParents - number of parents
+minhash - the root starting game piece of parent shard (current shard)
+fragmentsize - shard size (usually a define, a constant)
+*/
+int discoverfragment(char* workingfolder, uint64_t* parentshards, int numParents, gamehash minhash, char fragmentsize) {
+	uint64_t currentshard = (minhash >> fragmentsize);
+	uint64_t* childrenshards;
+	// Gives list of children shards that we send discovery children to that we send to
+	// TODO
+	int childrenshardcount = getchildrenshards(&childrenshards, workingfolder, fragmentsize, currentshard);
+
+	Game g;
+	game newg;
+	gamehash h;
+	char primitive;
+
+	int index = 0;
+
+	// Next Tier: Use CUDA Malloc when moving to GPU for "moves" and "fringe"
+	char moves[getMaxMoves()];
+	game* fringe = calloc(sizeof(game), getMaxMoves() * getMaxDepth());
+	if(fringe == NULL) {
+		printf("Memory allocation error\n");
+		return 1;
+	}
+
+	int movecount, i;
+
+	// Add incoming Discovery states from parent
+	// Multiple top node in shard
+	for (int i = 0; i < numParents; i++) {
+		// TODO
+		GET_DISCOVERY_STATES_FROM_SHARD(&fringe, &index, parentshards[i]);
+	}
+
+	while (index > 0) {
+		// Pop from fringe
+		g = fringe[index--];
+
+		movecount = generateMoves((char*) &moves, g);
+		for (i = 0; i < movecount; i++) {
+			newg = doMove(g, moves[i]);
+			h = getHash(newg);
+
+			// "isPrimitive" returns game status
+			primitive = isPrimitive(newg, moves[i]);
+
+			if (primitive != (char) NOT_PRIMITIVE) {
+				// Terminal state with win, loss, or tie
+				SAVE_INTO_SOLVER(h, primitive); // TODO
+			} else {
+				if ((h >> fragmentsize) == currentshard) {
+					// Still in current shard, ready to process next
+					fringe[index++] = newg;
+				} else {
+					// Send to child
+					// TODO
+					DETERMINE_AND_SEND_TO_CHILD(childrenshards, childrenshardcount, newg, workingfolder);
+				}
+			}
+		}
+	}
+	return 0;
+}
+
+// Upward Traversal
+// Run after all children solved
+void solvefragment(char* workingfolder, gamehash minhash, char fragmentsize) {
+	/*
+	gamehash* childrenshardsG;
+	int shardcount = getchildrenshards(&childrenshards, fragmentsize, minhash);
+	// Load solved fragments into array on GPU
+	// Load list of target hashes into array on GPU
+	// Create a new solver on GPU
+	for(int i = ; i >= ; i--) // First two values in input file contain the max and min depth
+	{
+		// GPU runs one tier of the solver
+	}
+	// Collect the data from the GPU
+	// Compress and save the shard into solvedfragmentfolder
+	*/
+
+
 }
 
 int main(int argc, char** argv)
