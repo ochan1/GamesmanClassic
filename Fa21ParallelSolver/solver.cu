@@ -19,7 +19,7 @@ void discovercurrentfragment(game startinggame, game* fringe, solverdata* localp
 		h = getHash(g);
 		if (solverread(localpositions, h&(SHARDOFFSETMASK)) == 0) { //If we don't find this position in our solver, expand it for discovery
 			solverinsert(localpositions, h&(SHARDOFFSETMASK), 1); //Insert 1 here to that position to signify that it has been expanded. Do this now to minimize the time other threads can access this and try to duplicate work.
-				
+			
 			movecount = generateMoves(moves, g);
 			for (k = 0; k < movecount; k++) { //Iterate through all children of the current position
 				newg = doMove(g, moves[k]);
@@ -28,8 +28,12 @@ void discovercurrentfragment(game startinggame, game* fringe, solverdata* localp
 				if (newpositionshard == currentshardid && !(solverread(localpositions, h&SHARDOFFSETMASK))) { //If we have a position in our current shard that hasn't been expanded, add it to the fringe
 					if(isPrimitive(newg, moves[k]) == NOT_PRIMITIVE)
 						fringe[index++] = newg;
-					else
+					else {
 						solverinsert(localpositions, h&(SHARDOFFSETMASK), 2);
+						// DEBUGGING
+						printf("Solver insert 2\n");
+						printf("\t%d %d\n", solverread(localpositions, h&(SHARDOFFSETMASK)), 2);
+					}
 				} else if (newpositionshard != currentshardid) { // If the child is not in the current shard, insert it into the appropriate child shard
 					for(int l = 0; l < targetshard->childrencount;l++) {
 						if (newpositionshard == targetshard->childrenshards[l]->shardid) {
@@ -125,7 +129,7 @@ void discoverfragment(char* workingfolder, shardgraph* targetshard, char fragmen
 		fwrite(&nppositionsfound, sizeof(int), 1, childnonprimitivefile); // Store a dummy space of 4 bytes to later save the number of positions found
 		fwrite(&nppositionsfound, sizeof(int), 1, childlossfile); // Store a dummy space of 4 bytes to later save the number of positions found
 		fwrite(&nppositionsfound, sizeof(int), 1, childtiefile); // Store a dummy space of 4 bytes to later save the number of positions found
-		// Recommendation GPU:L Try reverse, can distribute more effectively
+		// Recommendation GPU: Try reverse, can distribute more effectively
 		//  Currently, putting values from smallest to largest in list
 		// Connect4 -- smaller values are parents of larger
 		for(uint32_t j = 0; j < 1<<fragmentsize; j++) { //Could probably be made more efficient, but I think this setup is more easily parallelizable
@@ -147,7 +151,8 @@ void discoverfragment(char* workingfolder, shardgraph* targetshard, char fragmen
 				}
 			}
 		}
-		//printf("%d positions found\n", positionsfound);
+		// DEBUGGING
+		printf("%d %d %d positions found\n", nppositionsfound, losspositionsfound, tiepositionsfound);
 		fseek(childnonprimitivefile, 0, SEEK_SET);
 		fwrite(&nppositionsfound, sizeof(int), 1, childnonprimitivefile);
 		fseek(childlossfile, 0, SEEK_SET);
