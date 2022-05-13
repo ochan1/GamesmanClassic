@@ -221,7 +221,7 @@ int getchildrenshards(uint64_t** childrenshards, char shardsize, uint64_t parent
 	    	length += (parentshard & filter) ? 2 : 1;
 	    } 
     }
-	uint64_t* children = malloc(length * sizeof(uint64_t));
+	uint64_t* children = (uint64_t*) malloc(length * sizeof(uint64_t));
     int allocatedchildren = 0;
     int columnremainingbits = ROWCOUNT+1;
     for(int i = id_size - 1; i >= 0;) {
