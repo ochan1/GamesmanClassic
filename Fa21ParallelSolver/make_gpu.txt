@@ -2,9 +2,9 @@
 
 echo "Starting compilation."
 mkdir -p build
-nvcc -c -Xcompiler -fsigned-char solver.cu -o build/solver.o
-nvcc -c -Xcompiler -fsigned-char Connect4.cu -o build/Game.o
-nvcc -c -Xcompiler -fsigned-char memoryfastretrieval.cu -o build/memory.o
-nvcc -c -Xcompiler -fsigned-char maindriver.cu -o build/maindriver.o
+nvcc -c solver.cu -o build/solver.o
+nvcc -c Connect4.cu -o build/Game.o
+nvcc -c memoryfastretrieval.cu -o build/memory.o
+nvcc -c maindriver.cu -o build/maindriver.o
 nvcc -o build/connect4.exe build/maindriver.o build/solver.o build/Game.o build/memory.o
 echo "Compilation complete."
