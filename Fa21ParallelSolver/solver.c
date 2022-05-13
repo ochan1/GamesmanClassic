@@ -49,7 +49,7 @@ void discoverfragment(char* workingfolder, shardgraph* targetshard, char fragmen
 
 	// Gives list of children shards that we send discovery children to that we send to
 	int childrenshardcount = targetshard->childrencount;
-	solverdata** childrenshards = malloc(sizeof(solverdata*) * childrenshardcount);
+	solverdata** childrenshards = (solverdata**) malloc(sizeof(solverdata*) * childrenshardcount);
 
 	// Next Tier: Use CUDA Malloc when moving to GPU for "moves" and "fringe"
 	solverdata* localpositions = initializesolverdata(fragmentsize);
@@ -61,8 +61,8 @@ void discoverfragment(char* workingfolder, shardgraph* targetshard, char fragmen
 			return;
 		}
 	}
-	char* moves = malloc(sizeof(char) * getMaxMoves());
-	game* fringe = calloc(sizeof(game), getMaxMoves() * getMaxDepth());
+	char* moves = (char*) malloc(sizeof(char) * getMaxMoves());
+	game* fringe = (game*) calloc(sizeof(game), getMaxMoves() * getMaxDepth());
 	if (localpositions == NULL || fringe == NULL) {
 		printf("Memory allocation error\n");
 		fflush(stdout);
@@ -73,7 +73,7 @@ void discoverfragment(char* workingfolder, shardgraph* targetshard, char fragmen
 	// Multiple top node in shard
 	//Set up the file name
 	int filenamemaxlength = strlen("/transfer-100000000-100000000-x-primitive")+1;
-	char* filename = malloc(sizeof(char)*(filenamemaxlength + strlen(workingfolder)));
+	char* filename = (char*) malloc(sizeof(char)*(filenamemaxlength + strlen(workingfolder)));
 	if(filename == NULL) {
 		printf("Memory allocation error\n");
 		fflush(stdout);
@@ -125,6 +125,9 @@ void discoverfragment(char* workingfolder, shardgraph* targetshard, char fragmen
 		fwrite(&nppositionsfound, sizeof(int), 1, childnonprimitivefile); // Store a dummy space of 4 bytes to later save the number of positions found
 		fwrite(&nppositionsfound, sizeof(int), 1, childlossfile); // Store a dummy space of 4 bytes to later save the number of positions found
 		fwrite(&nppositionsfound, sizeof(int), 1, childtiefile); // Store a dummy space of 4 bytes to later save the number of positions found
+		// Recommendation GPU:L Try reverse, can distribute more effectively
+		//  Currently, putting values from smallest to largest in list
+		// Connect4 -- smaller values are parents of larger
 		for(uint32_t j = 0; j < 1<<fragmentsize; j++) { //Could probably be made more efficient, but I think this setup is more easily parallelizable
 			switch(solverread(childrenshards[i], j)) { //If the position was found in discovery, save it to the file and increment the number of positions found
 				case NOT_PRIMITIVE: {
@@ -262,19 +265,12 @@ void solvefragment(char* workingfolder, shardgraph* targetshard, char fragmentsi
 	// Gives list of children shards that we send discovery children to that we send to
 	int childrenshardcount = targetshard->childrencount;
 
-	playerdata** childrenshards = malloc(sizeof(playerdata*) * childrenshardcount);
-
-	game g;
-	game newg;
-	gamehash h;
-	char primitive;
-
-	int index = 0;
+	playerdata** childrenshards = (playerdata**) malloc(sizeof(playerdata*) * childrenshardcount);
 
 	// Next Tier: Use CUDA Malloc when moving to GPU for "moves" and "fringe"
 	solverdata* localpositions = initializesolverdata(fragmentsize);
 	int solvedshardfilenamemaxlength = strlen("/solved-100000000")+1;
-	char* solvedshardfilename = malloc(sizeof(char)*(solvedshardfilenamemaxlength + strlen(workingfolder)));
+	char* solvedshardfilename = (char*) malloc(sizeof(char)*(solvedshardfilenamemaxlength + strlen(workingfolder)));
 	strncpy(solvedshardfilename, workingfolder, strlen(workingfolder));
 	char* solvedshardfilenamewriteaddr = solvedshardfilename+strlen(workingfolder);
 	for(int i = 0; i < childrenshardcount; i++) {
@@ -287,8 +283,8 @@ void solvefragment(char* workingfolder, shardgraph* targetshard, char fragmentsi
 			return;
 		}
 	}
-	char* moves = malloc(sizeof(char) * getMaxMoves());
-	game* fringe = calloc(sizeof(game), getMaxMoves() * getMaxDepth());
+	char* moves = (char*) malloc(sizeof(char) * getMaxMoves());
+	game* fringe = (game*) calloc(sizeof(game), getMaxMoves() * getMaxDepth());
 	if (localpositions == NULL || fringe == NULL) {
 		printf("Memory allocation error\n");
 		return;
@@ -298,7 +294,7 @@ void solvefragment(char* workingfolder, shardgraph* targetshard, char fragmentsi
 	// Multiple top node in shard
 	//Set up the file name
 	int filenamemaxlength = strlen("/transfer-100000000-100000000-x-primitive")+1;
-	char* filename = malloc(sizeof(char)*(filenamemaxlength + strlen(workingfolder)));
+	char* filename = (char*) malloc(sizeof(char)*(filenamemaxlength + strlen(workingfolder)));
 	strncpy(filename, workingfolder, strlen(workingfolder));
 	char* filenamewriteaddr = filename+strlen(workingfolder);
 	const int SHARDOFFSETMASK = (1ULL << fragmentsize) - 1;
@@ -386,7 +382,7 @@ static int initializeshard(shardgraph* shardlist, char* shardinitialized, uint32
 		shardlist[startingshard].shardid = startingshard;
 		shardlist[startingshard].childrencount = childrencount;
 		//printf("Shard %d has %d children\n", startingshard, childrencount);
-		shardlist[startingshard].childrenshards = calloc(childrencount, sizeof(shardgraph*));
+		shardlist[startingshard].childrenshards = (shardgraph**) calloc(childrencount, sizeof(shardgraph*));
 		int subshardsadded = 1;
 		for(int i = 0; i < childrencount; i++) {
 			subshardsadded+= initializeshard(shardlist, shardinitialized, shardsize, childrenshards[i]);
@@ -400,7 +396,7 @@ static int initializeshard(shardgraph* shardlist, char* shardinitialized, uint32
 }
 static void initializeparentshard(shardgraph* shardlist, shardgraph* startingshard) {
 	if(!startingshard->parentshards) {
-		startingshard->parentshards = calloc(startingshard->parentcount, sizeof(shardgraph*));
+		startingshard->parentshards = (shardgraph**) calloc(startingshard->parentcount, sizeof(shardgraph*));
 		startingshard->parentcount = 0;
 		for(int i = 0; i < startingshard->childrencount; i++)
 		{
@@ -418,9 +414,9 @@ shardgraph* getstartingshard(shardgraph* shardlist, int shardsize)
 //Initializes all relevant shards. Returns the number of shards actually created.
 int initializeshardlist(shardgraph** shardlistptr, uint32_t shardsize) {
 	uint32_t shardcount = 1 << (hashLength() - shardsize);
-	shardgraph* shardlist = calloc(shardcount, sizeof(shardgraph));
+	shardgraph* shardlist = (shardgraph*) calloc(shardcount, sizeof(shardgraph));
 	*shardlistptr = shardlist;
-	char* shardinitialized = calloc(shardcount, sizeof(char));
+	char* shardinitialized = (char*) calloc(shardcount, sizeof(char));
 	uint32_t startingshard = getHash(getStartingPositions()) >> shardsize;
 	int validshards = initializeshard(shardlist, shardinitialized, shardsize, startingshard);
 	initializeparentshard(shardlist, shardlist+startingshard);

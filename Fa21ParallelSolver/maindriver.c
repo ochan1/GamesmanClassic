@@ -49,7 +49,7 @@ int main(int argc, char** argv)
 	}
   	initialize_constants();
 
-	  shardgraph* shardList;
+	shardgraph* shardList;
 	int validshards = initializeshardlist(&shardList, shardsize);
 	printf("Shard graph computed: %d shards will be computed\n", validshards);
 	fflush(stdout);
